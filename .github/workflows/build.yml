@@ -1,4 +1,4 @@
-name: Mercury Mobile Builder
+name: Mercury Smart Patcher
 on: [push, workflow_dispatch]
 
 jobs:
@@ -8,28 +8,25 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup UABEA
+      - name: Download UABEA
         run: |
-          # Robust download method to prevent "Not Found" errors
-          $url = "https://github.com/nesrak1/UABEA/releases/download/v7/UABEA-CLI-win-x64.zip"
-          Write-Host "Downloading UABEA from $url"
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          Invoke-WebRequest -Uri $url -OutFile "uabea.zip" -ErrorAction Stop
+          # Use curl with -L to follow redirects, avoiding the "Not Found" error
+          curl -L "https://github.com/nesrak1/UABEA/releases/download/v7/UABEA-CLI-win-x64.zip" -o uabea.zip
           Expand-Archive -Path uabea.zip -DestinationPath ./uabea -Force
 
-      - name: Auto-Find IDs and Patch
+      - name: Auto-Detect and Patch
         run: |
-          # 1. Ask UABEA for the list of internal assets
+          # 1. Dump asset info to a text file
           ./uabea/UABEAvalonia.exe info "shaders" > info.txt
           
-          # 2. Automatically find the Path ID for Player and Smoke shaders
+          # 2. Extract Path IDs for Player Chams and Smoke
           $playerID = Select-String -Path info.txt -Pattern "pure_pbs_highlighted" | ForEach-Object { $_.Line.Trim().Split(' ')[1] }
           $smokeID = Select-String -Path info.txt -Pattern "particles_alphablend" | ForEach-Object { $_.Line.Split(' ')[1] }
           
-          Write-Host "Targeting Player ID: $playerID"
-          Write-Host "Targeting Smoke ID: $smokeID"
+          Write-Host "Detected Player ID: $playerID"
+          Write-Host "Detected Smoke ID: $smokeID"
 
-          # 3. Create the patch script with the discovered IDs
+          # 3. Build the patch script on the fly
           $patch = @"
           modify 0 $playerID
           set m_Shader.m_Shader.ZTest 8
@@ -44,11 +41,11 @@ jobs:
           "@
           $patch | Out-File -FilePath auto_patch.txt -Encoding ascii
 
-          # 4. Apply the patch and compress to LZ4
+          # 4. Apply and compress
           ./uabea/UABEAvalonia.exe applypatch "shaders" "auto_patch.txt" "modded_shaders" -lz4
         
-      - name: Upload Result
+      - name: Upload Modded File
         uses: actions/upload-artifact@v4
         with:
-          name: Modded-File
+          name: Mercury-Mod-Bundle
           path: modded_shaders
