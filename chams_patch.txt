@@ -1,0 +1,13 @@
+# PLAYER CHAMS (pure_pbs_highlighted.shader)
+modify 0 PATH_ID_PLAYER
+set m_Shader.m_Shader.ZTest 8
+set m_Shader.m_Shader.LOD 1000
+set m_Shader.m_Shader.Cull 0
+set m_Shader.m_Shader.ZWrite 0
+set m_Shader.m_Shader.ZClip 0
+set m_Shader.m_Shader.m_Queue 4000
+
+# REMOVE INSIDE SMOKE (particles_alphablend.shader)
+modify 0 PATH_ID_SMOKE
+set m_Enabled 0
+set m_Shader.m_Shader.m_Queue 0
