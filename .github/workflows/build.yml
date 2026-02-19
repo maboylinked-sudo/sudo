@@ -1,31 +1,25 @@
-name: Mercury Optimized Builder
+name: Mercury Asset Builder
 on: [push]
 
 jobs:
-  build:
+  patch:
     runs-on: windows-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Setup UABEA CLI
         run: |
-          # Downloading UABEA CLI v7
+          # Use -L to follow redirects and a fixed version link
           curl -L -o uabea.zip https://github.com/nesrak1/UABEA/releases/download/v7/UABEA-CLI-win-x64.zip
           Expand-Archive -Path uabea.zip -DestinationPath ./uabea -Force
 
-      - name: Verify Input Files
+      - name: Apply Chams and No-Smoke
         run: |
-          # This ensures the workflow fails early if files are missing
-          if (!(Test-Path "shaders")) { throw "Shaders file not found!" }
-          if (!(Test-Path "chams_patch.txt")) { throw "Patch script not found!" }
-
-      - name: Patch Player Chams & Remove Smoke
-        run: |
-          # Using explicit paths and quotes to prevent Exit Code 1
+          # Use .\ to tell Windows to look in the current folder
           ./uabea/UABEAvalonia.exe applypatch ".\shaders" ".\chams_patch.txt" ".\modded_shaders" -lz4
         
-      - name: Upload Artifacts
+      - name: Upload Modded Shaders
         uses: actions/upload-artifact@v4
         with:
           name: Modded-C-Ops-Bundle
