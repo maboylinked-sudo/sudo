@@ -10,30 +10,26 @@ jobs:
 
       - name: Setup UABEA
         run: |
-          # 1. Download UABEA CLI using a stable method
-          $url = "https://github.com/nesrak1/UABEA/releases/download/v7/UABEA-CLI-win-x64.zip"
-          curl -L $url -o uabea.zip
+          # Use curl with -L to follow redirects, bypassing the "Not Found" error
+          curl -L "https://github.com/nesrak1/UABEA/releases/download/v7/UABEA-CLI-win-x64.zip" -o uabea.zip
           Expand-Archive -Path uabea.zip -DestinationPath ./uabea -Force
           
-          # 2. Verify the tool exists
-          if (!(Test-Path "./uabea/UABEAvalonia.exe")) { throw "UABEA download failed!" }
+          # Verify tool exists to prevent generic 'OperationStopped' errors
+          if (!(Test-Path "./uabea/UABEAvalonia.exe")) { throw "UABEA download failed" }
 
-      - name: Auto-Find IDs and Patch
+      - name: Auto-Detect and Patch
         run: |
-          # 1. Debug: List files to ensure 'shaders' is in the root
-          ls
-          
-          # 2. Ask UABEA for the list of assets
+          # 1. Export asset information to find current Path IDs
           ./uabea/UABEAvalonia.exe info "shaders" > info.txt
           
-          # 3. Find IDs for Player (pure_pbs_highlighted) and Smoke (particles_alphablend)
+          # 2. Extract IDs for Player (pure_pbs_highlighted) and Smoke (particles_alphablend)
           $playerID = Select-String -Path info.txt -Pattern "pure_pbs_highlighted" | ForEach-Object { $_.Line.Trim().Split(' ')[1] }
           $smokeID = Select-String -Path info.txt -Pattern "particles_alphablend" | ForEach-Object { $_.Line.Split(' ')[1] }
           
-          Write-Host "FOUND PLAYER ID: $playerID"
-          Write-Host "FOUND SMOKE ID: $smokeID"
+          Write-Host "Auto-Detected Player ID: $playerID"
+          Write-Host "Auto-Detected Smoke ID: $smokeID"
 
-          # 4. Create the patch script
+          # 3. Generate the patch script with discovered IDs
           $patch = @"
           modify 0 $playerID
           set m_Shader.m_Shader.ZTest 8
@@ -48,11 +44,11 @@ jobs:
           "@
           $patch | Out-File -FilePath auto_patch.txt -Encoding ascii
 
-          # 5. Apply the patch and compress
+          # 4. Apply patch and save as 'modded_shaders'
           ./uabea/UABEAvalonia.exe applypatch "shaders" "auto_patch.txt" "modded_shaders" -lz4
         
-      - name: Upload Result
+      - name: Upload Modded File
         uses: actions/upload-artifact@v4
         with:
-          name: Mercury-Finished-Bundle
+          name: Mercury-Mod-Bundle
           path: modded_shaders
