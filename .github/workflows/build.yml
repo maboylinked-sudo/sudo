@@ -1,4 +1,4 @@
-name: Mercury Smart Patcher
+name: Mercury Mobile Builder
 on: [push, workflow_dispatch]
 
 jobs:
@@ -10,29 +10,26 @@ jobs:
 
       - name: Setup UABEA
         run: |
-          # Automatically find and download the latest UABEA-CLI
-          $repo = "nesrak1/UABEA"
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest"
-          $asset = $release.assets | Where-Object { $_.name -like "*CLI-win-x64.zip" }
-          $url = $asset.browser_download_url
+          # Robust download method to prevent "Not Found" errors
+          $url = "https://github.com/nesrak1/UABEA/releases/download/v7/UABEA-CLI-win-x64.zip"
           Write-Host "Downloading UABEA from $url"
-          Invoke-WebRequest -Uri $url -OutFile "uabea.zip"
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Invoke-WebRequest -Uri $url -OutFile "uabea.zip" -ErrorAction Stop
           Expand-Archive -Path uabea.zip -DestinationPath ./uabea -Force
 
       - name: Auto-Find IDs and Patch
         run: |
-          # 1. Get the list of all shaders in your 'shaders' file
+          # 1. Ask UABEA for the list of internal assets
           ./uabea/UABEAvalonia.exe info "shaders" > info.txt
           
           # 2. Automatically find the Path ID for Player and Smoke shaders
-          # We use Select-String to find the name, then grab the ID number next to it
           $playerID = Select-String -Path info.txt -Pattern "pure_pbs_highlighted" | ForEach-Object { $_.Line.Trim().Split(' ')[1] }
           $smokeID = Select-String -Path info.txt -Pattern "particles_alphablend" | ForEach-Object { $_.Line.Split(' ')[1] }
           
-          Write-Host "Auto-Detected Player ID: $playerID"
-          Write-Host "Auto-Detected Smoke ID: $smokeID"
+          Write-Host "Targeting Player ID: $playerID"
+          Write-Host "Targeting Smoke ID: $smokeID"
 
-          # 3. Create the patch script with the IDs we just found
+          # 3. Create the patch script with the discovered IDs
           $patch = @"
           modify 0 $playerID
           set m_Shader.m_Shader.ZTest 8
@@ -53,5 +50,5 @@ jobs:
       - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: Mercury-Finished-Bundle
+          name: Modded-File
           path: modded_shaders
