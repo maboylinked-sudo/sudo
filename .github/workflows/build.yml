@@ -10,21 +10,28 @@ jobs:
 
       - name: Setup UABEA
         run: |
-          # Use a direct link to ensure the full zip downloads
-          Invoke-WebRequest -Uri "https://github.com/nesrak1/UABEA/releases/download/v7/UABEA-CLI-win-x64.zip" -OutFile "uabea.zip"
+          # Getting the latest release download URL automatically
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/nesrak1/UABEA/releases/latest"
+          $asset = $release.assets | Where-Object { $_.name -like "*CLI-win-x64.zip" }
+          $url = $asset.browser_download_url
+          Write-Host "Downloading from $url"
+          Invoke-WebRequest -Uri $url -OutFile "uabea.zip"
           Expand-Archive -Path uabea.zip -DestinationPath ./uabea -Force
 
       - name: Auto-Find IDs and Patch
         run: |
-          # 1. Export info to find the IDs
+          # 1. Ask UABEA for the list of assets in your 'shaders' file
           ./uabea/UABEAvalonia.exe info "shaders" > info.txt
           
-          # 2. Extract the Path IDs for your specific shaders
+          # 2. Automatically find the Path IDs for Player and Smoke
           $playerID = Select-String -Path info.txt -Pattern "pure_pbs_highlighted" | ForEach-Object { $_.Line.Split(' ')[1] }
           $smokeID = Select-String -Path info.txt -Pattern "particles_alphablend" | ForEach-Object { $_.Line.Split(' ')[1] }
           
-          # 3. Create the patch script dynamically
-          @"
+          Write-Host "Found Player ID: $playerID"
+          Write-Host "Found Smoke ID: $smokeID"
+
+          # 3. Create the patch script with the found IDs
+          $patch = @"
           modify 0 $playerID
           set m_Shader.m_Shader.ZTest 8
           set m_Shader.m_Shader.LOD 1000
@@ -35,9 +42,10 @@ jobs:
 
           modify 0 $smokeID
           set m_Enabled 0
-          "@ | Out-File -FilePath auto_patch.txt -Encoding ascii
+          "@
+          $patch | Out-File -FilePath auto_patch.txt -Encoding ascii
 
-          # 4. Apply the patch
+          # 4. Apply the patch and compress to LZ4
           ./uabea/UABEAvalonia.exe applypatch "shaders" "auto_patch.txt" "modded_shaders" -lz4
         
       - name: Upload Result
