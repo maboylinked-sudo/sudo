@@ -1,5 +1,6 @@
-# PLAYER CHAMS (pure_pbs_highlighted.shader)
-modify 0 PATH_ID_PLAYER
+# --- PLAYER CHAMS (pure_pbs_highlighted.shader) ---
+# Target ID: Found in UABEA UI for pure_pbs_highlighted
+modify 0 PLAYER_CHAMS_PATH_ID
 set m_Shader.m_Shader.ZTest 8
 set m_Shader.m_Shader.LOD 1000
 set m_Shader.m_Shader.Cull 0
@@ -7,7 +8,7 @@ set m_Shader.m_Shader.ZWrite 0
 set m_Shader.m_Shader.ZClip 0
 set m_Shader.m_Shader.m_Queue 4000
 
-# REMOVE INSIDE SMOKE (particles_alphablend.shader)
-modify 0 PATH_ID_SMOKE
+# --- REMOVE INSIDE SMOKE (particles_alphablend.shader) ---
+# Target ID: Found in UABEA UI for particles_alphablend
+modify 0 SMOKE_INSIDE_PATH_ID
 set m_Enabled 0
-set m_Shader.m_Shader.m_Queue 0
