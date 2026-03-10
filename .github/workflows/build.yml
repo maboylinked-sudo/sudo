@@ -1,48 +1,26 @@
-name: Dylib to Framework Converter
+name: Prepare Injection Binary
 on: [push, workflow_dispatch]
 
 jobs:
-  convert:
+  prepare:
     runs-on: macos-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Create Framework Structure
+      - name: Fix Binary Permissions
         run: |
-          # 1. Create the directory structure (the -p flag ensures parent dirs exist)
-          mkdir -p ESP.framework/Versions/A/Resources
+          # Make sure the binary is executable
+          chmod +x ESP.dylib
           
-          # 2. Copy the dylib into the structure
-          cp ESP.dylib ESP.framework/Versions/A/ESP
+          # Remove existing extended attributes that break signatures
+          xattr -c ESP.dylib
           
-          # 3. Create symlinks (Required for valid framework)
-          cd ESP.framework
-          ln -s Versions/A/ESP ESP
-          ln -s Versions/A Versions/Current
-          cd ..
-          
-          # 4. Create the Info.plist file
-          # The path is now guaranteed to exist because of the mkdir -p command above
-          cat <<EOF > ESP.framework/Versions/A/Resources/Info.plist
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundleExecutable</key>
-              <string>ESP</string>
-              <key>CFBundleIdentifier</key>
-              <string>com.yourname.ESP</string>
-              <key>CFBundlePackageType</key>
-              <string>FMWK</string>
-              <key>CFBundleShortVersionString</key>
-              <string>1.0</string>
-          </dict>
-          </plist>
-          EOF
+          # Rename for standard injection
+          cp ESP.dylib libESP.dylib
 
-      - name: Zip and Upload
+      - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
-          name: ESP-Framework
-          path: ESP.framework
+          name: Clean-ESP-Binary
+          path: libESP.dylib
