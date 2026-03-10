@@ -12,37 +12,33 @@ jobs:
         run: |
           # 1. Define Names
           FRAMEWORK_NAME="ESP"
+          # Create full directory tree
           mkdir -p $FRAMEWORK_NAME.framework/Versions/A/Resources
           
-          # 2. Prepare Binary: Move and fix Mach-O internal ID
-          # This is the secret step: The binary must know its own path!
+          # 2. Copy the binary
           cp ESP.dylib $FRAMEWORK_NAME.framework/Versions/A/$FRAMEWORK_NAME
-          install_name_tool -id @rpath/$FRAMEWORK_NAME.framework/$FRAMEWORK_NAME $FRAMEWORK_NAME.framework/Versions/A/$FRAMEWORK_NAME
           
-          # 3. Create Symlinks (Correctly order them)
+          # 3. Fix Mach-O ID (Ignore the warning about signature invalidation; we fix that later)
+          install_name_tool -id "@rpath/$FRAMEWORK_NAME.framework/$FRAMEWORK_NAME" "$FRAMEWORK_NAME.framework/Versions/A/$FRAMEWORK_NAME"
+          
+          # 4. Create Symlinks
           cd $FRAMEWORK_NAME.framework
           ln -s Versions/A/$FRAMEWORK_NAME $FRAMEWORK_NAME
           ln -s Versions/A Versions/Current
-          cd Versions/A
-          ln -s Resources Resources
-          cd ../..
+          # Link Resources if needed
+          ln -s Versions/A/Resources Resources
+          cd ..
           
-          # 4. Create proper Info.plist
-          cat <<EOF > $FRAMEWORK_NAME.framework/Versions/A/Resources/Info.plist
+          # 5. Create Info.plist (Using an absolute path to be safe)
+          cat <<EOF > "$FRAMEWORK_NAME.framework/Versions/A/Resources/Info.plist"
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-              <key>CFBundleDevelopmentRegion</key>
-              <string>English</string>
               <key>CFBundleExecutable</key>
               <string>$FRAMEWORK_NAME</string>
               <key>CFBundleIdentifier</key>
               <string>com.espproject.$FRAMEWORK_NAME</string>
-              <key>CFBundleInfoDictionaryVersion</key>
-              <string>6.0</string>
-              <key>CFBundleName</key>
-              <string>$FRAMEWORK_NAME</string>
               <key>CFBundlePackageType</key>
               <string>FMWK</string>
               <key>CFBundleShortVersionString</key>
@@ -50,6 +46,9 @@ jobs:
           </dict>
           </plist>
           EOF
+          
+      - name: Verify Structure
+        run: ls -R ESP.framework
 
       - name: Upload Framework
         uses: actions/upload-artifact@v4
