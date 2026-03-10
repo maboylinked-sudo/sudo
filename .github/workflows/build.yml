@@ -1,26 +1,58 @@
-name: Prepare Injection Binary
+name: Robust Framework Bundler
 on: [push, workflow_dispatch]
 
 jobs:
-  prepare:
+  bundle:
     runs-on: macos-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Fix Binary Permissions
+      - name: Create Framework Bundle
         run: |
-          # Make sure the binary is executable
-          chmod +x ESP.dylib
+          # 1. Define Names
+          FRAMEWORK_NAME="ESP"
+          mkdir -p $FRAMEWORK_NAME.framework/Versions/A/Resources
           
-          # Remove existing extended attributes that break signatures
-          xattr -c ESP.dylib
+          # 2. Prepare Binary: Move and fix Mach-O internal ID
+          # This is the secret step: The binary must know its own path!
+          cp ESP.dylib $FRAMEWORK_NAME.framework/Versions/A/$FRAMEWORK_NAME
+          install_name_tool -id @rpath/$FRAMEWORK_NAME.framework/$FRAMEWORK_NAME $FRAMEWORK_NAME.framework/Versions/A/$FRAMEWORK_NAME
           
-          # Rename for standard injection
-          cp ESP.dylib libESP.dylib
+          # 3. Create Symlinks (Correctly order them)
+          cd $FRAMEWORK_NAME.framework
+          ln -s Versions/A/$FRAMEWORK_NAME $FRAMEWORK_NAME
+          ln -s Versions/A Versions/Current
+          cd Versions/A
+          ln -s Resources Resources
+          cd ../..
+          
+          # 4. Create proper Info.plist
+          cat <<EOF > $FRAMEWORK_NAME.framework/Versions/A/Resources/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>English</string>
+              <key>CFBundleExecutable</key>
+              <string>$FRAMEWORK_NAME</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.espproject.$FRAMEWORK_NAME</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>$FRAMEWORK_NAME</string>
+              <key>CFBundlePackageType</key>
+              <string>FMWK</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+          </dict>
+          </plist>
+          EOF
 
-      - name: Upload Binary
+      - name: Upload Framework
         uses: actions/upload-artifact@v4
         with:
-          name: Clean-ESP-Binary
-          path: libESP.dylib
+          name: ESP-Framework-Fixed
+          path: ESP.framework
