@@ -1,54 +1,48 @@
-name: Mercury Smart Patcher
+name: Dylib to Framework Converter
 on: [push, workflow_dispatch]
 
 jobs:
-  patch:
-    runs-on: windows-latest
+  convert:
+    runs-on: macos-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup UABEA
+      - name: Create Framework Structure
         run: |
-          # Use curl with -L to follow redirects, bypassing the "Not Found" error
-          curl -L "https://github.com/nesrak1/UABEA/releases/download/v7/UABEA-CLI-win-x64.zip" -o uabea.zip
-          Expand-Archive -Path uabea.zip -DestinationPath ./uabea -Force
+          # 1. Create the standard framework directory structure
+          mkdir -p ESP.framework/Versions/A
           
-          # Verify tool exists to prevent generic 'OperationStopped' errors
-          if (!(Test-Path "./uabea/UABEAvalonia.exe")) { throw "UABEA download failed" }
-
-      - name: Auto-Detect and Patch
-        run: |
-          # 1. Export asset information to find current Path IDs
-          ./uabea/UABEAvalonia.exe info "shaders" > info.txt
+          # 2. Move and rename the dylib to match the framework name
+          # The binary inside a framework must match the framework name
+          cp ESP.dylib ESP.framework/Versions/A/ESP
           
-          # 2. Extract IDs for Player (pure_pbs_highlighted) and Smoke (particles_alphablend)
-          $playerID = Select-String -Path info.txt -Pattern "pure_pbs_highlighted" | ForEach-Object { $_.Line.Trim().Split(' ')[1] }
-          $smokeID = Select-String -Path info.txt -Pattern "particles_alphablend" | ForEach-Object { $_.Line.Split(' ')[1] }
+          # 3. Create symlinks (Required for the system to recognize it as a framework)
+          cd ESP.framework
+          ln -s Versions/A/ESP ESP
+          ln -s Versions/A Versions/Current
+          cd ..
           
-          Write-Host "Auto-Detected Player ID: $playerID"
-          Write-Host "Auto-Detected Smoke ID: $smokeID"
+          # 4. Create the Info.plist (Required for a functional framework)
+          cat <<EOF > ESP.framework/Versions/A/Resources/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>ESP</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.yourname.ESP</string>
+              <key>CFBundlePackageType</key>
+              <string>FMWK</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+          </dict>
+          </plist>
+          EOF
 
-          # 3. Generate the patch script with discovered IDs
-          $patch = @"
-          modify 0 $playerID
-          set m_Shader.m_Shader.ZTest 8
-          set m_Shader.m_Shader.LOD 1000
-          set m_Shader.m_Shader.Cull 0
-          set m_Shader.m_Shader.ZWrite 0
-          set m_Shader.m_Shader.ZClip 0
-          set m_Shader.m_Shader.m_Queue 4000
-
-          modify 0 $smokeID
-          set m_Enabled 0
-          "@
-          $patch | Out-File -FilePath auto_patch.txt -Encoding ascii
-
-          # 4. Apply patch and save as 'modded_shaders'
-          ./uabea/UABEAvalonia.exe applypatch "shaders" "auto_patch.txt" "modded_shaders" -lz4
-        
-      - name: Upload Modded File
+      - name: Zip and Upload
         uses: actions/upload-artifact@v4
         with:
-          name: Mercury-Mod-Bundle
-          path: modded_shaders
+          name: ESP-Framework
+          path: ESP.framework
