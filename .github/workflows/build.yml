@@ -10,20 +10,20 @@ jobs:
 
       - name: Create Framework Structure
         run: |
-          # 1. Create the standard framework directory structure
-          mkdir -p ESP.framework/Versions/A
+          # 1. Create the directory structure (the -p flag ensures parent dirs exist)
+          mkdir -p ESP.framework/Versions/A/Resources
           
-          # 2. Move and rename the dylib to match the framework name
-          # The binary inside a framework must match the framework name
+          # 2. Copy the dylib into the structure
           cp ESP.dylib ESP.framework/Versions/A/ESP
           
-          # 3. Create symlinks (Required for the system to recognize it as a framework)
+          # 3. Create symlinks (Required for valid framework)
           cd ESP.framework
           ln -s Versions/A/ESP ESP
           ln -s Versions/A Versions/Current
           cd ..
           
-          # 4. Create the Info.plist (Required for a functional framework)
+          # 4. Create the Info.plist file
+          # The path is now guaranteed to exist because of the mkdir -p command above
           cat <<EOF > ESP.framework/Versions/A/Resources/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
